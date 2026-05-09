@@ -1,6 +1,6 @@
 training:
   seed: 0
-  checkpoint_dir: /home/R11031/Gemdepth/checkpoint/gemdepth_stage2
+  checkpoint_dir: ./checkpoint/gemdepth_stage2
   save_freq: 5000
   val_freq: 10000
 
@@ -26,7 +26,7 @@ dataloader:
   num_workers: 4
 
 model:
-  video_path: "/home/R11031/Gemdepth/checkpoint/gemdepth.pth"
+  video_path: "./checkpoint/gemdepth.pth"
 
 encoder: 'vitl'
 pose_flag: True

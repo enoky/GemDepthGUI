@@ -1,6 +1,6 @@
 training:
   seed: 0
-  checkpoint_dir: /home/R11031/Gemdepth/checkpoint/gemdepth_stage1
+  checkpoint_dir: ./checkpoint/gemdepth_stage1
   save_freq: 5000
   val_freq: 10000
   
@@ -11,7 +11,7 @@ optimizer:
 dataset:
   train:
     mode: train
-    data_dirs:  ["/mnt/data-a804/R11031/vkitti/","/mnt/data-a808/R11031/tartanair/"]
+    data_dirs:  [""]
     crop_size: 518
     seq_len: 32
   
@@ -26,7 +26,7 @@ dataloader:
   num_workers: 4
 
 model:
-  video_path: "/home/R11031/Gemdepth/checkpoint/gemdepth.pth"
+  video_path: "./checkpoint/gemdepth.pth"
 
 encoder: 'vitl'
 pose_flag: True
