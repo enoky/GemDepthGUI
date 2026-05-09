@@ -1,0 +1,35 @@
+training:
+  seed: 0
+  checkpoint_dir: /home/R11031/Gemdepth/checkpoint/gemdepth_stage2
+  save_freq: 5000
+  val_freq: 10000
+
+optimizer:
+  kind: adamw
+  learning_rate: 1.0e-4
+
+dataset:
+  train:
+    mode: train
+    data_dirs:  ['']
+    crop_size: 518
+    seq_len: 32
+  
+  val:
+    mode: train
+    data_dirs: []
+    crop_size: 518
+    seq_len: 32
+    
+dataloader:
+  batch_size: 8
+  num_workers: 4
+
+model:
+  video_path: "/home/R11031/Gemdepth/checkpoint/gemdepth.pth"
+
+encoder: 'vitl'
+pose_flag: True
+num_gpus: 8
+total_step: 100000
+project_name: video
