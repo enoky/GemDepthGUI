@@ -21,6 +21,17 @@ GemDepth is a framework built on the insight that an explicit awareness of camer
 GemDepth achieves stateof-the-art performance across multiple datasets,
 particularly in complex dynamic scenarios.
 
+![network](assets/media/network.png)
+
+## 🌈: Zero-shot performance on KITTI
+Zero-shot generalization performance on KITTI benchmark.
+
+<img src="assets/media/kitti_gem36.gif" width="1241" height="752">  
+
+##  📝 Benchmarks performance
+![benchmark](assets/media/zero-shot.png)
+
+Comparisons with state-of-the-art methods across four of the most widely used benchmarks.
 ## ⏳ Usage
 
 ### Preparation
