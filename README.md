@@ -26,7 +26,7 @@ particularly in complex dynamic scenarios.
 ## 🌈: Zero-shot performance on KITTI
 Zero-shot generalization performance on KITTI benchmark.
 
-<img src="assets/media/kitti_gem36.gif" width="1241" height="752">  
+<img src="assets/media/kitti_gem.gif" width="1241" height="752">  
 
 ##  📝 Benchmarks performance
 ![benchmark](assets/media/zero-shot.png)
