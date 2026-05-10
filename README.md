@@ -53,7 +53,7 @@ depths, fps = gemdepth.infer_video_depth(frames, target_fps, input_size=args.inp
 ### Running script on video
 ```bash
 # run script on video
-python run_video.py --input_dir ./assets/example_videos --output_dir ./assets/example_videos  
+python run_video.py --input_dir ./assets/example_videos --output_dir ./assets/example_result  
 ```
 
 ## ✏️ Training Data
