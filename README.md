@@ -43,7 +43,7 @@ model_configs = {
 }
 gemdepth = GemDepth(**model_configs[argencoder])
 checkpoint = torch.load("./checkpoint/gemdepth.pth",map_location='cpu',weights_only=False)
-gemdepth.load_state_dict(checkpoint,strict=strict)
+gemdepth.load_state_dict(checkpoint,strict=True)
 gemdepth = gemdepth.to(DEVICE).eval()
 frames, target_fps = read_video_frames(video_path, args.max_len, args.target_fps, 1280)
 depths, fps = gemdepth.infer_video_depth(frames, target_fps, input_size=args.input_size,device=DEVICE, fp32=args.fp32)
