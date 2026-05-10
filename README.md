@@ -103,7 +103,10 @@ python evaluation/eval/eval.py \
 ## ✈️ Training
 To train GemDepth on mix-datasets, run
 ```Shell
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 accelerate launch train.py   
+## stage1
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 accelerate launch train.py --config-name stage1
+## stage2
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 accelerate launch train.py --config-name stage2
 ```
 
 
