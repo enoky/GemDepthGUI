@@ -32,10 +32,8 @@ def main(cfg):
         'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
     }
     model = GemDepth(**model_configs[cfg.encoder]).to(accelerator.device)
-    checkpoint = torch.load(cfg.model.video_path, map_location='cpu', weights_only=False)
-    ckpt = checkpoint.get("model", checkpoint) 
-    new_ckpt = {k.replace("module.", ""): v for k, v in ckpt.items()}
-    model.load_state_dict(new_ckpt, strict=True)
+    checkpoint = torch.load(cfg.model.video_path, map_location='cpu',weights_only=False)
+    model.load_state_dict(checkpoint, strict=True)
     model.pretrained.requires_grad_(False)
     dec_blocks_params = []
     other_params = []

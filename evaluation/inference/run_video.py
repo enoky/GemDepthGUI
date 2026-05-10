@@ -153,10 +153,8 @@ if __name__ == '__main__':
         'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
     }
     gemdepth = GemDepth(**model_configs[args.encoder])
-    checkpoint = torch.load("./checkpoint/gemdepth.pth", map_location='cpu')
-    ckpt = checkpoint.get("model", checkpoint) 
-    new_ckpt = {k.replace("module.", ""): v for k, v in ckpt.items()}
-    gemdepth.load_state_dict(new_ckpt, strict=False)
+    checkpoint = torch.load("./checkpoint/gemdepth.pth", map_location='cpu',weights_only=False)
+    gemdepth.load_state_dict(checkpoint, strict=True)
     gemdepth = gemdepth.to(DEVICE).eval()
     extensions = ['*.mp4', '*.avi', '*.mov', '*.mkv', '*.MP4']
     video_files = []
