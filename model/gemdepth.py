@@ -437,6 +437,122 @@ class GemDepth(nn.Module):
         depth_list = depth_list_aligned
 
         return np.stack(depth_list[:org_video_len], axis=0), target_fps
+
+    def infer_video_geometry(self, frames, target_fps, input_size=518, device='cuda', fp32=False):
+        frame_height, frame_width = frames[0].shape[:2]
+        ratio = max(frame_height, frame_width) / min(frame_height, frame_width)
+        if ratio > 1.78:  # we recommend to process video with ratio smaller than 16:9 due to memory limitation
+            input_size = int(input_size * 1.777 / ratio)
+            input_size = round(input_size / 14) * 14
+
+        transform = Compose([
+            Resize(
+                width=input_size,
+                height=input_size,
+                resize_target=False,
+                keep_aspect_ratio=True,
+                ensure_multiple_of=14,
+                resize_method='lower_bound',
+                image_interpolation_method=cv2.INTER_CUBIC,
+            ),
+            NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            PrepareForNet(),
+        ])
+
+        frame_list = [frames[i] for i in range(frames.shape[0])]
+        frame_step = INFER_LEN - OVERLAP
+        org_video_len = len(frame_list)
+        append_frame_len = (frame_step - (org_video_len % frame_step)) % frame_step + (INFER_LEN - frame_step)
+        frame_list = frame_list + [frame_list[-1].copy()] * append_frame_len
+
+        depth_list = []
+        extrinsic_list = []
+        intrinsic_list = []
+        pre_input = None
+        for frame_id in tqdm(range(0, org_video_len, frame_step)):
+            cur_list = []
+            for i in range(INFER_LEN):
+                cur_list.append(torch.from_numpy(transform({'image': frame_list[frame_id+i].astype(np.float32) / 255.0})['image']).unsqueeze(0).unsqueeze(0))
+            cur_input = torch.cat(cur_list, dim=1).to(device)
+            if pre_input is not None:
+                cur_input[:, :OVERLAP, ...] = pre_input[:, KEYFRAMES, ...]
+
+            with torch.no_grad():
+                with torch.autocast(device_type=device, enabled=(not fp32)):
+                    depth,_,extrinsic,intrinsic= self.forward(cur_input) # depth shape: [1, T, H, W]
+
+            input_height, input_width = cur_input.shape[-2:]
+            intrinsic = intrinsic.clone()
+            intrinsic[..., 0, :] *= frame_width / input_width
+            intrinsic[..., 1, :] *= frame_height / input_height
+            extrinsic = extrinsic[0].detach().cpu().numpy()
+            intrinsic = intrinsic[0].detach().cpu().numpy()
+
+            depth = depth.to(cur_input.dtype)
+            depth = F.interpolate(depth.flatten(0,1).unsqueeze(1), size=(frame_height, frame_width), mode='bilinear', align_corners=True)
+            depth_list += [depth[i][0].cpu().numpy() for i in range(depth.shape[0])]
+            extrinsic_list += [extrinsic[i] for i in range(extrinsic.shape[0])]
+            intrinsic_list += [intrinsic[i] for i in range(intrinsic.shape[0])]
+
+            pre_input = cur_input
+
+        del frame_list
+        gc.collect()
+
+        depth_list_aligned = []
+        extrinsic_list_aligned = []
+        intrinsic_list_aligned = []
+        ref_align = []
+        align_len = OVERLAP - INTERP_LEN
+        kf_align_list = KEYFRAMES[:align_len]
+
+        for frame_id in range(0, len(depth_list), INFER_LEN):
+            if len(depth_list_aligned) == 0:
+                depth_list_aligned += depth_list[:INFER_LEN]
+                extrinsic_list_aligned += extrinsic_list[:INFER_LEN]
+                intrinsic_list_aligned += intrinsic_list[:INFER_LEN]
+                for kf_id in kf_align_list:
+                    ref_align.append(depth_list[frame_id+kf_id])
+            else:
+                curr_align = []
+                for i in range(len(kf_align_list)):
+                    curr_align.append(depth_list[frame_id+i])
+
+                
+                scale, shift = compute_scale_and_shift(np.concatenate(curr_align),
+                                                           np.concatenate(ref_align),
+                                                           np.concatenate(np.ones_like(ref_align)==1))
+
+                pre_depth_list = depth_list_aligned[-INTERP_LEN:]
+                post_depth_list = depth_list[frame_id+align_len:frame_id+OVERLAP]
+                for i in range(len(post_depth_list)):
+                    post_depth_list[i] = post_depth_list[i] * scale + shift
+                    post_depth_list[i][post_depth_list[i]<0] = 0
+                depth_list_aligned[-INTERP_LEN:] = get_interpolate_frames(pre_depth_list, post_depth_list)
+                extrinsic_list_aligned[-INTERP_LEN:] = extrinsic_list[frame_id+align_len:frame_id+OVERLAP]
+                intrinsic_list_aligned[-INTERP_LEN:] = intrinsic_list[frame_id+align_len:frame_id+OVERLAP]
+
+                for i in range(OVERLAP, INFER_LEN):
+                    new_depth = depth_list[frame_id+i] * scale + shift
+                    new_depth[new_depth<0] = 0
+                    depth_list_aligned.append(new_depth)
+                    extrinsic_list_aligned.append(extrinsic_list[frame_id+i])
+                    intrinsic_list_aligned.append(intrinsic_list[frame_id+i])
+
+                ref_align = ref_align[:1]
+                for kf_id in kf_align_list[1:]:
+                    new_depth = depth_list[frame_id+kf_id] * scale + shift
+                    new_depth[new_depth<0] = 0
+                    ref_align.append(new_depth)
+
+        depth_list = depth_list_aligned
+        extrinsic_list = extrinsic_list_aligned
+        intrinsic_list = intrinsic_list_aligned
+
+        return (np.stack(depth_list[:org_video_len], axis=0),
+                np.stack(extrinsic_list[:org_video_len], axis=0),
+                np.stack(intrinsic_list[:org_video_len], axis=0),
+                target_fps)
     
 class PositionalEncoding(nn.Module):
     def __init__(
