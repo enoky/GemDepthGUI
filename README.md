@@ -13,6 +13,7 @@
 
 
 ## 📢 News
+- **[2026.05.14]** Add [pointcloud reconstruction](https://github.com/Yuecheng919/GemDepth/evaluation/inference/run_video_pointcloud) for video.
 - **[2026.05.09]** 🔥 GemDepth is out! It effectively recovering fine-grained
 details and has better 3D temporal consistency.
 
