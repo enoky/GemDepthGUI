@@ -1,15 +1,20 @@
-<h2 align="center"> GemDepth: Geometry-Embedded Features for 3D-Consistent Video Depth
-</h2>
 <div align="center">
+<h2 align="center"> GemDepth: Geometry-Embedded Features for 3D-Consistent Video Depth </h2>
 
-<h5 align="center"> If you like our project, please give us a star ⭐ on GitHub for latest update.  </h2>
-
+[**Yuecheng liu**](https://github.com/Yuecheng919/)<sup>1</sup>, [**Junda Cheng**](https://github.com/Junda24)<sup>1*</sup>, [**Wenjing Liao**](https://github.com/waldeinsamkeits)<sup>1,2</sup>, [**Hanrui Cheng**](https://github.com/MarcelRay0312)<sup>1,2</sup>, [**Yuzhou Wang**](https://github.com/YuzhouWang999)<sup>1</sup>, [**Xin Yang**](https://sites.google.com/view/xinyang/home)<sup>1,3</sup>
+<br><br>
+<sup>*</sup>Corresponding Author
+<br>
+<sup>1</sup>Hust, <sup>2</sup>Carizon, <sup>3</sup>Optics Valley Laboratory
+  <h5>If you like our project, please give us a star ⭐ on GitHub for the latest updates!</h5>
+  
+  [![Model](https://img.shields.io/badge/🤗%20HuggingFace-Model%20-yellow)](https://huggingface.co/YuechengLiu/GemDepth) [![Paper](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2605.10525)
 </div>
 
 
 ## 📢 News
 - **[2026.05.09]** 🔥 GemDepth is out! It effectively recovering fine-grained
-details and has better 3D temporal consistency!
+details and has better 3D temporal consistency.
 
 
 ## 👋 Introduction
@@ -22,11 +27,6 @@ GemDepth achieves stateof-the-art performance across multiple datasets,
 particularly in complex dynamic scenarios.
 
 ![network](assets/media/network.png)
-
-## 🌈: Zero-shot performance on KITTI
-Zero-shot generalization performance on KITTI benchmark.
-
-<img src="assets/media/kitti_gem36.gif" width="1241" height="752">  
 
 ##  📝 Benchmarks performance
 ![benchmark](assets/media/zero-shot.png)
@@ -76,6 +76,11 @@ python run_video.py --input_dir ./assets/example_videos --output_dir ./assets/ex
 * [Dynamic Replica](https://github.com/facebookresearch/dynamic_stereo)
 * [IRS](https://github.com/HKBU-HPML/IRS)
 
+## ✈️ Model weights
+
+| Model      |                                               Link                                                |
+|:----:|:-------------------------------------------------------------------------------------------------:|
+| GemDepth| [Download 🤗](https://huggingface.co/YuechengLiu/GemDepth/resolve/main/gemdepth.pth?download=true) |
 
 ## ✈️ Evaluation
 
