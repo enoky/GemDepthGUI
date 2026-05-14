@@ -80,7 +80,7 @@ python run_video.py --input_dir ./assets/example_videos --output_dir ./assets/ex
 
 | Model      |                                               Link                                                |
 |:----:|:-------------------------------------------------------------------------------------------------:|
-| GemDepth| [Download 🤗](https://huggingface.co/YuechengLiu/GemDepth/blob/main/gemdepth.pth?download=true) |
+| GemDepth| [Download 🤗](https://huggingface.co/YuechengLiu/GemDepth/resolve/main/gemdepth.pth?download=true) |
 
 ## ✈️ Evaluation
 
