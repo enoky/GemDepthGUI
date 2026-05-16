@@ -52,6 +52,16 @@ pip install -r requirements.txt
 |:----:|:-------------------------------------------------------------------------------------------------:|
 | GemDepth| [Download 🤗](https://huggingface.co/YuechengLiu/GemDepth/resolve/main/gemdepth.pth?download=true) |
 
+The final structure shoule be like
+```
+GemDepth
+├── checkpoint/
+├──── gemdepth.pth
+├── configs/
+├── model/
+├── ...
+```
+
 ### Use our model
 ```bash
 import torch
