@@ -13,6 +13,7 @@
 
 
 ## 📢 News
+- **[2026.05.16]** 🤗🤗🤗 Hugging Face Gradio demos released.
 - **[2026.05.16]** Add GPU memory adjustment schemes for inference and training.
 - **[2026.05.15]** 🤗🤗🤗Pre-trained weights released on Hugging Face.
 - **[2026.05.14]** Add [`run_video_pointcloud`](https://github.com/Yuecheng919/GemDepth/evaluation/inference/run_video_pointcloud) for pointcloud reconstruction.
