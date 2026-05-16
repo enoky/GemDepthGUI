@@ -46,6 +46,12 @@ conda activate gemdepth
 pip install -r requirements.txt
 ```
 
+### Model weights
+
+| Model      |                                               Link                                                |
+|:----:|:-------------------------------------------------------------------------------------------------:|
+| GemDepth| [Download 🤗](https://huggingface.co/YuechengLiu/GemDepth/resolve/main/gemdepth.pth?download=true) |
+
 ### Use our model
 ```bash
 import torch
@@ -102,12 +108,6 @@ which require about 15GB GPU memory. You can adjust these parameters according t
 * [MVS-Synth](https://phuang17.github.io/DeepMVS/mvs-synth.html)
 * [Dynamic Replica](https://github.com/facebookresearch/dynamic_stereo)
 * [IRS](https://github.com/HKBU-HPML/IRS)
-
-## ✈️ Model weights
-
-| Model      |                                               Link                                                |
-|:----:|:-------------------------------------------------------------------------------------------------:|
-| GemDepth| [Download 🤗](https://huggingface.co/YuechengLiu/GemDepth/resolve/main/gemdepth.pth?download=true) |
 
 ## ✈️ Evaluation
 
