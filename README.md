@@ -11,6 +11,13 @@
  [![Project Page](https://img.shields.io/badge/GemDepth-Website-green?logo=googlechrome&logoColor=green)](https://r11031.github.io/website/) [![Model](https://img.shields.io/badge/🤗%20HuggingFace-Model%20-yellow)](https://huggingface.co/YuechengLiu/GemDepth) [![Paper](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2605.10525)
 </div>
 
+## 🤗 Demo Video
+
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=o6Z2p-P9hSE">
+    <img src="https://img.youtube.com/vi/o6Z2p-P9hSE/maxresdefault.jpg" width="75%" alt="GemDepth Overview Video">
+  </a>
+</div>
 
 ## 📢 News
 - **[2026.05.16]** 🤗🤗🤗 Hugging Face Gradio demos released.
