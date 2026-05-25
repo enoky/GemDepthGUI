@@ -207,4 +207,4 @@ If you find our works useful in your research, please consider citing our papers
 ```
 # Acknowledgements
 
-This project is based on [VideoDepthAnything](https://github.com/DepthAnything/Video-Depth-Anything/) and [DepthAnythingV2](https://github.com/DepthAnything/Depth-Anything-V2). We thank the original authors for their excellent works.
+This project is based on [VideoDepthAnything](https://github.com/DepthAnything/Video-Depth-Anything/)、[VGGT](https://github.com/facebookresearch/vggt) and [DepthAnythingV2](https://github.com/DepthAnything/Depth-Anything-V2). We thank the original authors for their excellent works.
