@@ -205,6 +205,17 @@ If you find our works useful in your research, please consider citing our papers
 }
 
 ```
-# Acknowledgements
+
+## ⭐Star History
+
+<a href="https://www.star-history.com/?repos=Yuecheng919%2FGemDepth&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Yuecheng919/GemDepth&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Yuecheng919/GemDepth&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Yuecheng919/GemDepth&type=date&legend=top-left" />
+ </picture>
+</a>
+
+## 👏Acknowledgements
 
 This project is based on [VideoDepthAnything](https://github.com/DepthAnything/Video-Depth-Anything/)、[VGGT](https://github.com/facebookresearch/vggt) and [DepthAnythingV2](https://github.com/DepthAnything/Depth-Anything-V2). We thank the original authors for their excellent works.
