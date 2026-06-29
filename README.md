@@ -20,6 +20,7 @@
 </div>
 
 ## 📢 News
+- **[2026.06.29]** 🔥🔥🔥 Add comparisons with the recent generative video depth method [DVD](https://github.com/EnVision-Research/DVD), showing that GemDepth achieves superior spatial accuracy and temporal consistency.
 - **[2026.05.18]** 🤗🤗🤗 Evaluation datasets released on Hugging Face.
 - **[2026.05.16]** 🤗🤗🤗 Hugging Face Gradio demos released.
 - **[2026.05.16]** Add GPU memory adjustment schemes for inference and training.
@@ -41,9 +42,15 @@ particularly in complex dynamic scenarios.
 ![network](assets/media/network.png)
 
 ##  📝 Benchmarks performance
-![benchmark](assets/media/zero-shot.png)
+<p align="center">
+  <img src="assets/media/zero-shot_AbsRel_DVD.png" alt="zero-shot AbsRel DVD" width="80%">
+</p>
 
-Comparisons with state-of-the-art methods across four of the most widely used benchmarks.
+<p align="center">
+  <img src="assets/media/zero-shot_TAE_DVD.png" alt="zero-shot TAE DVD" width="80%">
+</p>
+
+Comparisons with state-of-the-art methods across four widely used benchmarks show that GemDepth consistently achieves superior performance in both spatial accuracy and temporal consistency. All evaluations follow the same protocol and metrics adopted in VideoDepthAnything to ensure a fair comparison. Compared with previous discriminative methods [VideoDepthAnything](https://github.com/DepthAnything/Video-Depth-Anything/), as well as recent generative approaches [DVD](https://github.com/EnVision-Research/DVD), GemDepth delivers the best overall results, demonstrating its effectiveness in producing accurate and temporally stable depth predictions for complex dynamic scenes.
 ## ⏳ Usage
 
 ### Preparation
