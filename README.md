@@ -11,6 +11,8 @@
  [![Project Page](https://img.shields.io/badge/GemDepth-Website-green?logo=googlechrome&logoColor=green)](https://r11031.github.io/website/) [![Model](https://img.shields.io/badge/🤗%20HuggingFace-Model%20-yellow)](https://huggingface.co/YuechengLiu/GemDepth) [![Paper](https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2605.10525)
 </div>
 
+> **Note:** This is an **unofficial fork** of [GemDepth](https://github.com/Yuechengliu919/GemDepth) that adds a desktop GUI and minor compatibility fixes. All credit for the model and research goes to the original authors. For the official project, see the links above.
+
 ## 🤗 Demo Video
 
 <div align="center">
@@ -20,6 +22,7 @@
 </div>
 
 ## 📢 News
+- **[2026.06.30]** 🖥️ Added a desktop **GUI** for single/batch video depth processing with exact-FPS grayscale output (see the 🖥️ GUI section below).
 - **[2026.06.29]** 🔥🔥🔥 Add comparisons with the recent generative video depth method [DVD](https://github.com/EnVision-Research/DVD), showing that GemDepth achieves superior spatial accuracy and temporal consistency.
 - **[2026.05.18]** 🤗🤗🤗 Evaluation datasets released on Hugging Face.
 - **[2026.05.16]** 🤗🤗🤗 Hugging Face Gradio demos released.
@@ -32,7 +35,7 @@ details and has better 3D temporal consistency.
 
 ## 👋 Introduction
 
-Welcome to the official repository for **GemDepth**! 
+Welcome to **GemDepth**! (This repository is an unofficial fork — see the note at the top.)
 
 GemDepth is a framework built on the insight that an explicit awareness of camera motion and global 3D structure is a prerequisite for 3D consistency. Distinctively, GemDepth introduces a Geometry-Embedding Module (GEM) that predicts inter-frame camera poses to generate implicit geometric embeddings. This injection of motion priors equips the network with intrinsic 3D perception and alignment capabilities. Guided by these geometric cues, our Alternating Spatio-Temporal Transformer (ASTT) captures latent point-level correspondences to simultaneously enhance spatial precision for sharp details and enforce rigorous temporal consistency.
 
@@ -40,6 +43,41 @@ GemDepth achieves state of-the-art performance across multiple datasets,
 particularly in complex dynamic scenarios.
 
 ![network](assets/media/network.png)
+
+## 🖥️ GUI
+
+This repository adds a desktop **GUI** (`gemdepth_gui.py`) that turns one — or many — input videos into **one grayscale depth video each**, with no command line required. It is a thin wrapper around the same `infer_video_depth` pipeline used by `run_video.py`.
+
+<!-- Optional: add a screenshot at assets/media/gui.png and uncomment the line below -->
+<!-- ![GUI](assets/media/gui.png) -->
+
+### Quick start (Windows)
+
+1. Download the model and place it at `./checkpoint/gemdepth.pth` (see [Model weights](#model-weights)).
+2. Launch the GUI:
+   - **Double-click `run_gui.bat`** — it activates the project's `.venv` and starts the app, or
+   - From the repository root: `python gemdepth_gui.py`
+
+> Run from the repository root so that `./checkpoint/gemdepth.pth` and the `model` package resolve correctly.
+
+### Features
+
+- **Single or batch**: add individual files or a whole folder, reorder the queue, and skip or overwrite existing outputs.
+- **Exact output FPS**: the output frame rate matches the input **exactly**, including irregular NTSC rates such as `24000/1001`. No frames are resampled — frame count and duration are preserved.
+- **Grayscale depth output**: writes one `*_depth.mp4` per input, normalized per-video over the 2nd–98th percentile for stable, flicker-free contrast.
+- **Controls**: encoder (`vits` / `vitb` / `vitl`), input size, max resolution, `fp32`, and **GPU-memory presets** (≈44 / 25 / 15 GB) matching the windows described in [Running script on video](#running-script-on-video).
+- **Live feedback**: per-file status, detected FPS, progress bar, and a running log.
+- **Persistent settings**: your selections (encoder, paths, preset, etc.) are saved to `gui_settings.json` and restored on the next launch.
+
+CUDA is recommended; CPU works but is significantly slower.
+
+### Utilities
+
+- **`clean_pycache.bat`** — removes all `__pycache__` folders and stray `.pyc` / `.pyo` files under the repository (the `.venv` folder is skipped).
+
+### Compatibility note
+
+For broader GPU/PyTorch support, `model/vggt/layers/attention.py` and `model/tools/blocks.py` were modified so that scaled-dot-product attention falls back **Flash → memory-efficient → math** instead of forcing the Flash Attention backend only. This fixes `RuntimeError: No available kernel. Aborting execution.` on GPUs or PyTorch builds without a Flash Attention kernel (common on Windows). If you re-pull these files from upstream, reapply the change.
 
 ##  📝 Benchmarks performance
 <p align="center">
