@@ -65,7 +65,9 @@ class Attention(nn.Module):
             #     v,
             #     dropout_p=self.attn_drop.p if self.training else 0.0,
             # )
-            with torch.nn.attention.sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+            with torch.nn.attention.sdpa_kernel(
+                [SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]
+            ):
                 dtype = k.dtype
                 with torch.autocast("cuda", dtype=torch.bfloat16):
                     x = scaled_dot_product_attention(q, k, v, dropout_p=self.attn_drop.p,scale=self.scale)

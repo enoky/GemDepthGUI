@@ -1,3 +1,10 @@
 # Checkpoint folder
 checkpoint/
 .venv/
+
+# Python bytecode cache
+__pycache__/
+*.py[cod]
+
+# GUI settings (per-machine)
+gui_settings.json
