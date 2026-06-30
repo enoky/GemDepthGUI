@@ -93,7 +93,7 @@ Comparisons with state-of-the-art methods across four widely used benchmarks sho
 
 ### Preparation
 ```Shell
-git clone https://github.com/Yuechengliu919/GemDepth
+git clone https://github.com/enoky/GemDepth
 cd GemDepth
 conda create -n gemdepth python=3.10
 conda activate gemdepth
