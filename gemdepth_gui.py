@@ -1,8 +1,9 @@
 """
 GemDepth GUI - single / batch video depth processing.
 
-Outputs one grayscale depth video per input video. The output frame rate
-matches the input exactly, including irregular NTSC rates such as 24000/1001.
+Outputs one grayscale HEVC Main10 depth video per input video. The output
+frame rate matches the input exactly, including irregular NTSC rates such as
+24000/1001.
 
 Run from the repository root (so ./checkpoint/gemdepth.pth and the model
 package resolve correctly):
@@ -17,7 +18,17 @@ import json
 import queue
 import threading
 import traceback
+import shutil
+import subprocess
+import gc
 from fractions import Fraction
+
+# On Windows, recent PyTorch builds can fail with WinError 1114 when torch is
+# first imported after GUI/media libraries have already initialized their DLLs.
+# Import it before OpenCV and Tkinter, and on the main thread, to keep DLL load
+# order deterministic. This also makes a broken PyTorch install fail once at
+# application startup instead of once for every queued video.
+import torch
 
 import numpy as np
 import cv2
@@ -130,8 +141,6 @@ class ModelManager:
         self.device = None
 
     def ensure_loaded(self, encoder, checkpoint_path, log):
-        import torch  # lazy: keeps GUI startup fast and import errors visible
-
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if (
             self._model is not None
@@ -156,8 +165,77 @@ class ModelManager:
         self._model = model
         self._encoder = encoder
         self._ckpt = checkpoint_path
+        # The checkpoint dictionary is only needed while loading weights. Drop
+        # it now so a large CPU-side copy is not retained unnecessarily.
+        del checkpoint
+        gc.collect()
         log("Model ready.")
         return model
+
+    def unload(self, log):
+        """Release the cached model and all reclaimable CUDA memory.
+
+        Deleting the CUDA model is required before empty_cache() can return its
+        storage to the driver. A small CUDA-context footprint may remain until
+        the GUI process exits; that memory is owned by the active CUDA runtime,
+        not by the GemDepth model.
+        """
+        if self._model is None:
+            _release_unused_cuda_memory(log, "CUDA cleanup")
+            self._encoder = None
+            self._ckpt = None
+            self.device = None
+            return
+
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.synchronize()
+            except Exception:
+                pass
+
+        model = self._model
+        self._model = None
+        self._encoder = None
+        self._ckpt = None
+        self.device = None
+        del model
+        gc.collect()
+        _release_unused_cuda_memory(log, "Model unloaded")
+
+
+def _format_gib(num_bytes):
+    return float(num_bytes) / (1024.0 ** 3)
+
+
+def _release_unused_cuda_memory(log, label="CUDA cleanup"):
+    """Return unused PyTorch allocations to the CUDA driver and log results."""
+    if not torch.cuda.is_available():
+        return
+
+    try:
+        before_alloc = torch.cuda.memory_allocated()
+        before_reserved = torch.cuda.memory_reserved()
+    except Exception:
+        before_alloc = before_reserved = 0
+
+    gc.collect()
+    try:
+        torch.cuda.empty_cache()
+    except Exception as exc:
+        log(f"{label}: torch.cuda.empty_cache() failed: {exc}")
+        return
+
+    try:
+        after_alloc = torch.cuda.memory_allocated()
+        after_reserved = torch.cuda.memory_reserved()
+        log(
+            f"{label}: PyTorch allocated {_format_gib(before_alloc):.2f} -> "
+            f"{_format_gib(after_alloc):.2f} GiB; reserved "
+            f"{_format_gib(before_reserved):.2f} -> "
+            f"{_format_gib(after_reserved):.2f} GiB."
+        )
+    except Exception:
+        log(f"{label}: unused CUDA cache released.")
 
 
 def apply_memory_preset(preset_name, log):
@@ -173,46 +251,176 @@ def apply_memory_preset(preset_name, log):
     )
 
 
-def write_grayscale_depth_video(depths, output_path, fps_fraction, log):
-    """Write a grayscale depth mp4 at the exact source frame rate.
+HEVC_CRF = "8"
+HEVC_PRESET = "medium"
 
-    Normalization: per-video global 2nd-98th percentile, so brightness is
-    temporally stable and robust to single-frame outliers.
+
+def _find_ffmpeg():
+    """Return an ffmpeg executable suitable for HEVC Main10 export."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        return ffmpeg
+
+    # Optional fallback used by imageio on many Python installs. We do not make
+    # this a hard dependency, but using it when present avoids a PATH issue.
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+
+def _startupinfo_no_window():
+    """Avoid opening an ffmpeg console window on Windows."""
+    if os.name != "nt":
+        return None
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    return startupinfo
+
+
+def write_grayscale_depth_video(depths, output_path, fps_fraction, log,
+                                percentile_normalize=False):
+    """Write a grayscale depth video as HEVC Main10 / yuv420p10le / CFR.
+
+    By default, the complete per-video model range is mapped linearly to
+    limited-range 10-bit luma (Y=64..940), without discarding either tail.
+    Optional 2nd-98th percentile normalization clips extreme samples before
+    mapping. Both modes use one range for the entire video, preserving temporal
+    stability and avoiding per-frame brightness pumping.
     """
     if depths is None or len(depths) == 0:
         raise ValueError("no depth frames to write")
+
+    ffmpeg = _find_ffmpeg()
+    if not ffmpeg:
+        raise RuntimeError(
+            "FFmpeg is required for HEVC Main10 depth export. "
+            "Install FFmpeg or add ffmpeg.exe to PATH."
+        )
 
     depths = np.asarray(depths)
     if depths.ndim == 4:  # [N, 1, H, W] -> [N, H, W]
         depths = depths[:, 0]
     n, h, w = depths.shape[0], depths.shape[-2], depths.shape[-1]
 
-    d_min, d_max = np.percentile(depths, 2), np.percentile(depths, 98)
+    # yuv420p10le requires even dimensions. The decord path already enforces
+    # this; this is a safety net for fallback decoders or unusual source sizes.
+    even_h = h if h % 2 == 0 else h + 1
+    even_w = w if w % 2 == 0 else w + 1
+    if even_h != h or even_w != w:
+        log(f"  padding depth frames for yuv420p10le: {w}x{h} -> {even_w}x{even_h}")
+        depths = np.pad(
+            depths,
+            ((0, 0), (0, even_h - h), (0, even_w - w)),
+            mode="edge",
+        )
+        h, w = even_h, even_w
+
+    full_min, full_max = float(np.min(depths)), float(np.max(depths))
+    if percentile_normalize:
+        d_min, d_max = np.percentile(depths, 2), np.percentile(depths, 98)
+        range_label = "2-98% clipped"
+    else:
+        d_min, d_max = full_min, full_max
+        range_label = "full min/max (no percentile clipping)"
+
     if not np.isfinite(d_min) or not np.isfinite(d_max) or d_max <= d_min:
-        d_min, d_max = float(np.min(depths)), float(np.max(depths))
-        if d_max <= d_min:
+        d_min, d_max = full_min, full_max
+        if not np.isfinite(d_min) or not np.isfinite(d_max) or d_max <= d_min:
             d_min, d_max = 0.0, 1.0
-    log(f"  depth range (2-98%): {d_min:.4f} - {d_max:.4f}")
+    log(f"  depth range [{range_label}]: {d_min:.4f} - {d_max:.4f}")
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-
-    # cv2's FFmpeg backend converts this double to a rational timebase
-    # (av_d2q), reproducing e.g. 24000/1001 from 23.976.
-    fps_float = float(fps_fraction)
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(output_path, fourcc, fps_float, (w, h))
-    if not writer.isOpened():
-        raise RuntimeError(f"cv2 could not open writer for {output_path}")
-
+    tmp_output = output_path + ".tmp.mp4"
     try:
+        if os.path.exists(tmp_output):
+            os.remove(tmp_output)
+    except OSError:
+        pass
+
+    fps_token = (
+        str(fps_fraction.numerator)
+        if fps_fraction.denominator == 1
+        else f"{fps_fraction.numerator}/{fps_fraction.denominator}"
+    )
+
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-f", "rawvideo",
+        "-pix_fmt", "yuv420p10le",
+        "-s:v", f"{w}x{h}",
+        "-framerate", fps_token,
+        "-i", "pipe:0",
+        "-an", "-sn", "-dn",
+        "-c:v", "libx265",
+        "-preset", HEVC_PRESET,
+        "-crf", HEVC_CRF,
+        "-profile:v", "main10",
+        "-pix_fmt", "yuv420p10le",
+        "-tag:v", "hvc1",
+        "-color_range", "tv",
+        "-colorspace", "bt709",
+        "-color_primaries", "bt709",
+        "-color_trc", "bt709",
+        "-x265-params", "range=limited:log-level=error",
+        "-fps_mode", "cfr",
+        "-r", fps_token,
+        tmp_output,
+    ]
+
+    log(
+        f"  writing HEVC Main10 depth: {w}x{h} @ {fps_to_str(fps_fraction)} "
+        f"CRF {HEVC_CRF}, {HEVC_PRESET}"
+    )
+
+    neutral_uv = np.full((h // 2, w // 2), 512, dtype=np.uint16)
+    scale = np.float32(940.0 - 64.0)
+    offset = np.float32(64.0)
+
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        startupinfo=_startupinfo_no_window(),
+    )
+    try:
+        assert proc.stdin is not None
         for i in range(n):
             depth = depths[i]
             norm = np.clip((depth - d_min) / (d_max - d_min + 1e-8), 0, 1)
-            gray = (norm * 255).astype(np.uint8)
-            bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-            writer.write(bgr)
+            y10 = np.rint(norm * scale + offset).astype(np.uint16, copy=False)
+            if not y10.flags.c_contiguous:
+                y10 = np.ascontiguousarray(y10)
+            proc.stdin.write(y10.tobytes())
+            proc.stdin.write(neutral_uv.tobytes())
+            proc.stdin.write(neutral_uv.tobytes())
+    except BrokenPipeError:
+        # ffmpeg already failed; collect and report stderr below.
+        pass
     finally:
-        writer.release()
+        if proc.stdin:
+            try:
+                proc.stdin.close()
+            except OSError:
+                pass
+
+    stderr = proc.stderr.read().decode("utf-8", errors="replace") if proc.stderr else ""
+    rc = proc.wait()
+    if rc != 0:
+        try:
+            if os.path.exists(tmp_output):
+                os.remove(tmp_output)
+        except OSError:
+            pass
+        raise RuntimeError(f"ffmpeg HEVC Main10 export failed with code {rc}:\n{stderr.strip()}")
+
+    os.replace(tmp_output, output_path)
 
 
 class VideoProcessor:
@@ -222,7 +430,8 @@ class VideoProcessor:
         self.mm = model_manager
 
     def process(self, video_path, output_path, *, encoder, checkpoint, input_size,
-                max_res, fp32, preset, log, fps_callback=None):
+                max_res, fp32, preset, percentile_normalize, log,
+                fps_callback=None):
         from model.utils.dc_utils import read_video_frames
 
         apply_memory_preset(preset, log)
@@ -245,7 +454,10 @@ class VideoProcessor:
         # infer returns exactly len(frames) depths -> 1:1, duration preserved.
         log(f"  inferred {len(depths)} depth frames")
 
-        write_grayscale_depth_video(depths, output_path, fps_fraction, log)
+        write_grayscale_depth_video(
+            depths, output_path, fps_fraction, log,
+            percentile_normalize=percentile_normalize,
+        )
         log(f"✓ saved: {output_path}")
 
 
@@ -288,6 +500,8 @@ class App:
             "input_size": self.var_input_size,
             "max_res": self.var_max_res,
             "fp32": self.var_fp32,
+            "percentile_normalize": self.var_percentile_normalize,
+            "unload_after_batch": self.var_unload_after_batch,
             "preset": self.var_preset,
             "overwrite": self.var_overwrite,
             "checkpoint": self.var_ckpt,
@@ -376,6 +590,8 @@ class App:
         self.var_input_size = tk.IntVar(value=518)
         self.var_max_res = tk.IntVar(value=1280)
         self.var_fp32 = tk.BooleanVar(value=False)
+        self.var_percentile_normalize = tk.BooleanVar(value=False)
+        self.var_unload_after_batch = tk.BooleanVar(value=True)
         self.var_preset = tk.StringVar(value="High (~44GB)")
         self.var_overwrite = tk.BooleanVar(value=False)
         self.var_ckpt = tk.StringVar(value=os.path.join(ROOT_DIR, "checkpoint", "gemdepth.pth"))
@@ -397,6 +613,10 @@ class App:
         ttk.Label(row2, text="GPU memory").pack(side="left")
         ttk.Combobox(row2, textvariable=self.var_preset, values=list(MEMORY_PRESETS),
                      width=16, state="readonly").pack(side="left", padx=(4, 14))
+        ttk.Checkbutton(row2, text="Normalize 2-98%",
+                        variable=self.var_percentile_normalize).pack(side="left", padx=6)
+        ttk.Checkbutton(row2, text="Unload model after batch",
+                        variable=self.var_unload_after_batch).pack(side="left", padx=6)
         ttk.Checkbutton(row2, text="Overwrite existing outputs",
                         variable=self.var_overwrite).pack(side="left", padx=6)
 
@@ -523,6 +743,8 @@ class App:
             input_size=int(self.var_input_size.get()),
             max_res=int(self.var_max_res.get()),
             fp32=bool(self.var_fp32.get()),
+            percentile_normalize=bool(self.var_percentile_normalize.get()),
+            unload_after_batch=bool(self.var_unload_after_batch.get()),
             preset=self.var_preset.get(),
             overwrite=bool(self.var_overwrite.get()),
         )
@@ -549,6 +771,27 @@ class App:
         total = len(params["files"])
         done = 0
         try:
+            # Load PyTorch/model once before entering the per-video loop. A DLL,
+            # checkpoint, or model-startup failure is batch-wide; retrying it for
+            # every clip only produces a wall of identical errors.
+            try:
+                q.put((MSG_LOG, "Preparing PyTorch and GemDepth model ..."))
+                q.put((MSG_LOG,
+                       f"PyTorch {torch.__version__} | CUDA runtime {torch.version.cuda} | "
+                       f"CUDA available: {torch.cuda.is_available()}"))
+                apply_memory_preset(params["preset"], lambda m: q.put((MSG_LOG, m)))
+                self.model_manager.ensure_loaded(
+                    params["encoder"], params["checkpoint"],
+                    lambda m: q.put((MSG_LOG, m)),
+                )
+            except Exception as e:
+                q.put((MSG_LOG, f"BATCH STARTUP ERROR: {e}"))
+                q.put((MSG_LOG, traceback.format_exc()))
+                for idx in range(total):
+                    q.put((MSG_STATUS, idx, "error"))
+                q.put((MSG_PROGRESS, total, total))
+                return
+
             for idx, video_path in enumerate(params["files"]):
                 if self.cancel_event.is_set():
                     q.put((MSG_LOG, "Cancelled."))
@@ -576,6 +819,7 @@ class App:
                         max_res=params["max_res"],
                         fp32=params["fp32"],
                         preset=params["preset"],
+                        percentile_normalize=params["percentile_normalize"],
                         log=lambda m: q.put((MSG_LOG, m)),
                         fps_callback=lambda s, i=idx: q.put((MSG_FILEFPS, i, s)),
                     )
@@ -588,6 +832,23 @@ class App:
                 done += 1
                 q.put((MSG_PROGRESS, done, total))
         finally:
+            # GemDepth was previously kept resident on CUDA forever so the next
+            # Start was faster. That also made Task Manager/nvidia-smi show most
+            # of the VRAM as still occupied after a completed or cancelled batch.
+            if params.get("unload_after_batch", True):
+                q.put((MSG_LOG, "Unloading GemDepth model and releasing CUDA memory ..."))
+                try:
+                    self.model_manager.unload(lambda m: q.put((MSG_LOG, m)))
+                except Exception as exc:
+                    q.put((MSG_LOG, f"CUDA cleanup warning: {exc}"))
+                    q.put((MSG_LOG, traceback.format_exc()))
+            else:
+                # Keep the model for a faster next batch, but still return any
+                # no-longer-used activation cache to the CUDA driver.
+                _release_unused_cuda_memory(
+                    lambda m: q.put((MSG_LOG, m)),
+                    "Batch cleanup (model retained)",
+                )
             q.put((MSG_DONE,))
 
     # -- queue draining (UI thread) ---------------------------------------- #
